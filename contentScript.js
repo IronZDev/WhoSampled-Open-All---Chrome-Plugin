@@ -14,28 +14,24 @@ function OpenLinks(songURLs, songName, artistName) {
 function JustOpenVisible(section, songName, artistName) {
 	let songsToOpen = section.querySelectorAll('div.list > div.listEntry > a');
 	songsToOpen = [...songsToOpen].map(link => link.href);
-	OpenLinks(songsToOpen, songName, artistName);
-	console.log(songsToOpen);
+	return songsToOpen;
 }
 
-async function FetchAndOpenAll (url, songName, artistName, sectionTitle) {
+async function FetchAndOpenAll (url) {
 	let songURLs = [];
 	// Naive implementation, fetch one page after another
 	await fetch(url).then(response => response.text())
-	.then(text => {
+	.then(async text => {
 		const parser = new DOMParser();
 		const htmlDocument = parser.parseFromString(text, "text/html");
-        console.log(htmlDocument.querySelectorAll("div.list > div.listEntry > a"));
 		songURLs = [...songURLs, ...[...htmlDocument.querySelectorAll("div.list > div.listEntry > a")].map(link => link.href)];
 		const nextBtn = htmlDocument.querySelector('div.pagination > span.next > a');
 		if (nextBtn) {
-			console.log(nextBtn.href);
-			let songsFromNextPage = FetchAndOpenAll(nextBtn.href, songName, artistName);
-			songURLs.push(songsFromNextPage);
+			let songsFromNextPage = await FetchAndOpenAll(nextBtn.href);
+			songURLs = [...songURLs, ...songsFromNextPage];
 		}
 	});
-	console.log(songURLs);
-	OpenLinks(songURLs, songName, artistName);
+	return songURLs; 
 }
 
 async function OpenAll(btn) {
@@ -44,16 +40,17 @@ async function OpenAll(btn) {
 	const seeAllBtn = section.querySelector('header > a.moreButton');
 	const songName = document.querySelector('div.trackInfo > h1 > meta[itemprop="name"]').content;
 	const artistName = document.querySelector('div.trackInfo > h1 > span.trackArtistNames > meta[itemprop="name"]').content;
+	let songURLs;
 	if (!seeAllBtn) {
-		
 		if (detailedPageRegex.test(window.location.href)) {
-			await FetchAndOpenAll(window.location.href, songName, artistName, sectionTitle);
+			songURLs = await FetchAndOpenAll(window.location.href, songName, artistName, sectionTitle);
 		} else {
-			JustOpenVisible(section, songName, artistName);
+			songURLs = JustOpenVisible(section, songName, artistName);
 		}
 	} else {
-		await FetchAndOpenAll(seeAllBtn.href, songName, artistName, sectionTitle);
+		songURLs = await FetchAndOpenAll(seeAllBtn.href, songName, artistName, sectionTitle);
 	}
+	OpenLinks(songURLs, songName, artistName);
 }
 
 function CreateOpenAllButton () {

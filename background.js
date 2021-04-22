@@ -11,12 +11,21 @@ chrome.runtime.onInstalled.addListener(function () {
     async function (request, sender, sendResponse) {
 		try {
 			console.log(request.links);
-			chrome.tabs.query({active: true}, currentTab => chrome.tabs.group({tabIds: currentTab[0].id}, async groupId => {
+			chrome.tabs.query({active: true, currentWindow: true}, currentTab => chrome.tabs.group({tabIds: currentTab[0].id}, async groupId => {
 				chrome.tabGroups.update(groupId, {color: "yellow", title: `Samples of ${request.song} by ${request.artist}`}, grp => {console.log(grp)});
+				let isSearchPageRemoved = false;
 				for (link of request.links) {
-					await chrome.tabs.create({active: false, url: link}, tab => chrome.tabs.group({tabIds: tab.id, groupId}, () => {}));
+					await chrome.tabs.create({active: false, url: link}, tab => {
+						chrome.scripting.executeScript({function: () => {window.stop();}, target: {tabId: tab.id}},
+						() => {});
+						chrome.tabs.group({tabIds: tab.id, groupId}, () => {
+							if (!isSearchPageRemoved) {
+								chrome.tabs.ungroup(currentTab[0].id, () => {isSearchPageRemoved = true;});
+
+							}
+						});
+					});
 				}
-				chrome.tabs.ungroup({groupId, tabIds: currentTab.id}, () => {});
 			}));			
 			sendResponse({
 				status: "OK"
